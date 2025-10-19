@@ -1,0 +1,60 @@
+body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #app {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f2f5;
+        }
+        /* 🎨 画布容器：定义视口范围 */
+        .workflow-designer {
+            width: 1000px; 
+            height: 600px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            position: relative;
+            overflow: hidden; 
+            cursor: grab; /* 默认显示可拖动画布的光标 */
+        }
+        .workflow-designer.panning {
+            cursor: grabbing;
+        }
+        svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .workflow-node {
+            position: absolute;
+            width: 120px;
+            height: 60px;
+            background-color: #42b983;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            cursor: pointer; /* 节点上显示指针，优先级高于画布 grab */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-weight: bold;
+            font-size: 14px;
+            user-select: none;
+            box-sizing: border-box;
+            will-change: transform; /* 提升拖拽时的性能 */
+        }
+        .workflow-node.dragging {
+            cursor: grabbing;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        .workflow-edge {
+            stroke: #888;
+            stroke-width: 2;
+            fill: none;
+        }
+        #arrowhead {
+            fill: #888;
+        }
