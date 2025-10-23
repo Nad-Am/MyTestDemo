@@ -24,35 +24,68 @@ const fetchAI = async (callback) => {
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  const getchunk = () => {
+    reader.read().then(({ done, value }) => {
+      if (done) return;
 
-    buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-    // 按行分割
-    const lines = buffer.split("\n");
-    buffer = lines.pop(); // 保留最后可能残缺的行
+      // 按行分割
+      const lines = buffer.split("\n");
+      buffer = lines.pop(); // 保留最后可能残缺的行
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data:")) continue;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data:")) continue;
 
-      const jsonStr = trimmed.slice(5).trim();
-      if (jsonStr === "[DONE]") {
-        console.log("✅ 流结束");
-        return;
+        const jsonStr = trimmed.slice(5).trim();
+        if (jsonStr === "[DONE]") {
+          console.log("✅ 流结束");
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const delta = parsed?.choices?.[0]?.delta?.content;
+          console.log(delta);
+          if (delta) callback(delta);
+        } catch (err) {
+          // 解析失败很可能是半条 JSON，安全忽略
+        }
       }
+      getchunk();
+    });
+  };
+  getchunk();
+  // while (true) {
+  //   const { done, value } = await reader.read();
+  //   if (done) break;
 
-      try {
-        const parsed = JSON.parse(jsonStr);
-        const delta = parsed?.choices?.[0]?.delta?.content;
-        if (delta) callback(delta);
-      } catch (err) {
-        // 解析失败很可能是半条 JSON，安全忽略
-      }
-    }
-  }
+  //   buffer += decoder.decode(value, { stream: true });
+
+  //   // 按行分割
+  //   const lines = buffer.split("\n");
+  //   buffer = lines.pop(); // 保留最后可能残缺的行
+
+  //   for (const line of lines) {
+  //     const trimmed = line.trim();
+  //     if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+  //     const jsonStr = trimmed.slice(5).trim();
+  //     if (jsonStr === "[DONE]") {
+  //       console.log("✅ 流结束");
+  //       return;
+  //     }
+
+  //     try {
+  //       const parsed = JSON.parse(jsonStr);
+  //       const delta = parsed?.choices?.[0]?.delta?.content;
+  //       if (delta) callback(delta);
+  //     } catch (err) {
+  //       // 解析失败很可能是半条 JSON，安全忽略
+  //     }
+  //   }
+  // }
 
   // 尝试解析残留的最后一行
   //   if (buffer.trim().startsWith("data:")) {

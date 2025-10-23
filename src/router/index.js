@@ -8,6 +8,23 @@ const routes = [
     component: () => import("@/views/Flow.vue"),
   },
   {
+    path: "/canvasfLow",
+    name: "canvasfLow",
+    component: () => import("@/views/CanvasFLow.vue"),
+  },
+  {
+    // AntV6
+    path: "/antv6",
+    name: "antv6",
+    component: () => import("@/views/AntV6.vue"),
+  },
+  {
+    // JointFlow
+    path: "/jointFlow",
+    name: "JointFlow",
+    component: () => import("@/views/JointFlow.vue"),
+  },
+  {
     path: "/virtual",
     name: "Virtual",
     component: () => import("@/views/VirtualList.vue"),
