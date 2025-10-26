@@ -1,7 +1,7 @@
 // store.js
 
 import { defineStore } from "pinia";
-import { initialEdges, initialNodes } from "./init";
+import { initialEdges, initialNodes } from "../script/init";
 
 // --- ⚙️ 核心常量定义 ---
 const NODE_WIDTH = 120;
@@ -780,6 +780,8 @@ export const useWorkflowStore = defineStore("workflow", {
         setTimeout(() => {
           // 模拟执行结果（90%成功率）
           if (Math.random() > 0.1) {
+            node.status = NODE_STATUS.COMPLETED;
+            console.log(`节点 ${node.id} (${node.label}) 执行完成`, node);
             resolve();
           } else {
             reject(new Error("模拟执行失败"));

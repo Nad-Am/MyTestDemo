@@ -11,6 +11,9 @@ import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/common' // 包含常见语言
 import 'highlight.js/styles/github.css'
+// import markdownItKatex from 'markdown-it-katex'
+import katex from 'katex';
+import 'katex/dist/katex.min.css'
 
 
 const container = ref(null)
@@ -55,7 +58,8 @@ function extractSegmentsFromBuffer(input) {
       }
       const parts = outside.split(/\n{2,}/)
       for (let p = 0; p < parts.length - 1; p++) {
-        const part = parts[p]
+        let part = parts[p]
+        
         if (part.trim()) segments.push(part + '\n\n')
       }
       return { segments, remaining: parts[parts.length - 1] || '' }
@@ -120,6 +124,40 @@ function extractSegmentsFromBuffer(input) {
   return { segments, remaining: '' }
 }
 
+// --- 3. 定义手动 KaTeX 渲染函数 ---
+function renderKaTeX(htmlString) {
+    // 块级公式：$$...$$
+    htmlString = htmlString.replace(/\$\$([\s\S]+?)\$\$/g, (match, formula) => {
+        try {
+            // 使用 KaTeX 渲染，并包裹在 <p> 中，以保持块级元素的布局
+            return '<p>' + katex.renderToString(formula.trim(), {
+                displayMode: true,
+                throwOnError: false
+            }) + '</p>';
+        } catch (e) {
+            return `<p style="color:red;">KaTeX Block Error: ${e.message}</p>`;
+        }
+    });
+
+    // 行内公式：$...$
+    // 注意：这里的正则需要避免匹配到 Markdown-it 转义后的 $ 符号
+    htmlString = htmlString.replace(/\$([^$\s]+?)\$/g, (match, formula) => {
+        // 简单检查以避免误伤 HTML 标签
+        if (formula.includes('<') || formula.includes('>')) return match; 
+        
+        try {
+            return katex.renderToString(formula.trim(), {
+                displayMode: false,
+                throwOnError: false
+            });
+        } catch (e) {
+            return `<span style="color:red;">KaTeX Inline Error: ${e.message}</span>`;
+        }
+    });
+
+    return htmlString;
+}
+
 /**
  * 渲染 buffer 中已完成的 segments，并把剩余放回 buffer
  */
@@ -127,10 +165,26 @@ function renderBuffered() {
   const { segments, remaining } = extractSegmentsFromBuffer(buffer)
 
   // 渲染片段到 fixedSection
-  for (const part of segments) {
-    if (!part || !part.trim()) continue
-    const html = DOMPurify.sanitize(md.render(part))
-    fixedSection.value.insertAdjacentHTML('beforeend', html)
+ // 渲染片段到 fixedSection
+  for (let part of segments) {
+      if (!part || !part.trim()) continue
+      
+      // 1. **预处理**：将 [\ ... \] 转换为 $$ ... $$ (保持不变)
+      part = part.replace(/\\\[\s*([\s\S]+?)\s*\\\]/g, (_, expr) => `$$\n${expr}\n$$`)
+      console.log('Preprocessed part:', part);
+      // 2. **Markdown 解析**：转换为原始 HTML (包含未渲染的 $...$)
+      let html = md.render(part)
+      
+      // 3. **KaTeX 渲染**：手动调用 renderKaTeX 将 $...$ 替换为 KaTeX HTML
+      html = renderKaTeX(html) 
+
+      // 4. **安全清理**：清理并允许 KaTeX/MathML 标签
+      const safeHtml = DOMPurify.sanitize(html, {
+          ADD_TAGS: ['span', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'mord', 'mfrac', 'msub', 'msup', 'msubsup', 'mi', 'mo', 'mn', 'mspace', 'mstyle', 'mtext'], // 扩展 KaTeX/MathML 所需标签
+          ADD_ATTR: ['class', 'style', 'data-mathml'] // KaTeX 使用 class 和 style
+      })
+
+      fixedSection.value.insertAdjacentHTML('beforeend', safeHtml)
   }
 
   // 移除 fixedSection 中重复标记（如果你希望 reset 标记，也可选择移除 dataset.highlighted）
@@ -154,7 +208,11 @@ function renderBuffered() {
   // livePreview 显示 remaining（未闭合或未完成部分）
   nextTick(() => {
     if (!livePreview.value) return
-    livePreview.value.innerHTML = DOMPurify.sanitize(md.render(remaining))
+    // livePreview.value.innerHTML = DOMPurify.sanitize(md.render(remaining))
+    livePreview.value.innerHTML = DOMPurify.sanitize(md.render(remaining), {
+      ADD_TAGS: ['span', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn'],
+      ADD_ATTR: ['class', 'style']
+    })
     if (container.value) container.value.scrollTop = container.value.scrollHeight
   })
 

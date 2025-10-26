@@ -1,13 +1,13 @@
 <template>
   <div 
     :id="node.id"
-    :class="['workflow-node', node.type, node.status]" 
+    :class="['workflow-node', node.type, `node-status`, node.status ? node.status  : '']" 
     :style="nodeStyle"
     @mousedown.stop="handleMouseDown"
   >
     <div class="node-icon">{{ getNodeIcon(node.type) }}</div>
     <div class="node-label">{{ node.label }}</div>
-    <div class="node-status" v-if="node.status">{{ getStatusText(node.status) }}</div>
+    <div :class="['node-status', node-status]" v-if="node.status">{{ getStatusText(node.status) }}</div>
 
     <div class="node-controls">
       <button @click.stop="handleInsert('above')" class="control-btn top-btn">↑</button>

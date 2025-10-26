@@ -15,7 +15,7 @@ export const NODE_STATUS = {
 const initialNodes = new Map();
 const initialEdges = new Map();
 
-const TOTAL_NODES = 1000;
+const TOTAL_NODES = 10;
 const COLS = 10; // 每行 10 个节点
 const H_GAP = 180; // 节点横向间距
 const V_GAP = 120; // 节点纵向间距

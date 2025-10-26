@@ -5,24 +5,30 @@ const routes = [
   {
     path: "/",
     name: "Flow",
-    component: () => import("@/views/Flow.vue"),
+    component: () => import("@/views/flower/Flow.vue"),
   },
   {
     path: "/canvasfLow",
     name: "canvasfLow",
-    component: () => import("@/views/CanvasFLow.vue"),
+    component: () => import("@/views/flower/CanvasFlow.vue"),
   },
   {
     // AntV6
     path: "/antv6",
     name: "antv6",
-    component: () => import("@/views/AntV6.vue"),
+    component: () => import("@/views/flower/AntV6.vue"),
   },
   {
     // JointFlow
     path: "/jointFlow",
     name: "JointFlow",
-    component: () => import("@/views/JointFlow.vue"),
+    component: () => import("@/views/flower/JointFlow.vue"),
+  },
+  {
+    // VueFlow
+    path: "/vueFlow",
+    name: "VueFlow",
+    component: () => import("@/views/flower/VueFlow.vue"),
   },
   {
     path: "/virtual",

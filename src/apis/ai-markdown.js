@@ -4,7 +4,7 @@ const fetchAI = async (callback) => {
   const payload = {
     messages: [
       { role: "system", content: "You are a helpful assistant" },
-      { role: "user", content: "Hi, 2025编程语言排行表" },
+      { role: "user", content: "Hi, 输出数学中很难的公式" },
     ],
     model: "deepseek-chat",
     stream: true,
@@ -47,7 +47,7 @@ const fetchAI = async (callback) => {
         try {
           const parsed = JSON.parse(jsonStr);
           const delta = parsed?.choices?.[0]?.delta?.content;
-          console.log(delta);
+          // console.log(delta);
           if (delta) callback(delta);
         } catch (err) {
           // 解析失败很可能是半条 JSON，安全忽略

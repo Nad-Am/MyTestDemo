@@ -23,7 +23,12 @@
     //   '# 流式 Markdown\n\n',
     //   '这是第一段文字。\n\n',
     //   '```js\nconsole.log("Hello World");\n```',
-    //   '\n表格：\n| 名称 | 值 |\n|------|----|\n| A | 1 |\n| B | 2 |'
+    //   '\n表格：\n| 名称 | 值 |\n|------|----|\n| A | 1 |\n| B | 2 |',
+    //   `
+    //   $$ 
+    //   \frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u} \cdot \nabla) \mathbf{u} = -\frac{1}{\rho} \nabla p + \nu \nabla^2 \mathbf{u} + \mathbf{f} 
+    //   $$
+    //   `
     // ]
   
     // let i = 0
@@ -32,6 +37,11 @@
     //   i++
     //   if (i >= chunks.length) clearInterval(timer)
     // }, 500)
+//     const chunk = `$$
+// \\frac{\\partial \\mathbf{u}}{\\partial t} + (\\mathbf{u} \\cdot \\nabla) \\mathbf{u} = -\\frac{1}{\\rho} \\nabla p + \\nu \\nabla^2 \\mathbf{u} + \\mathbf{f}
+// $$`
+
+//     mdComp.value.appendChunk(chunk);
     fetchAI((chunk) => {
       mdComp.value.appendChunk(chunk)
       allContent += chunk
