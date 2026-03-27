@@ -12,6 +12,7 @@
     <div class="node-controls">
       <button @click.stop="handleInsert('above')" class="control-btn top-btn">↑</button>
       <button @click.stop="handleInsert('below')" class="control-btn bottom-btn">+</button>
+      <button @click.stop="handleInsertBranch" class="control-btn branch-btn">🔀</button>
     </div>
   </div>
 </template>
@@ -88,6 +89,10 @@ function handleMouseDown(event) {
 
 function handleInsert(direction) {
     workflowStore.insertNode(props.node.id, direction);
+}
+
+function handleInsertBranch() {
+  workflowStore.insertBranchNode(props.node.id);
 }
 </script>
 
@@ -238,4 +243,5 @@ function handleInsert(direction) {
 
 .top-btn { top: -10px; left: 50%; transform: translateX(-50%); }
 .bottom-btn { bottom: -10px; left: 50%; transform: translateX(-50%); }
+.branch-btn { right: -10px; top: 50%; transform: translateY(-50%); background-color: #28a745; }
 </style>

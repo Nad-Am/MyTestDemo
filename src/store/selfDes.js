@@ -883,24 +883,22 @@ export const useWorkflowStore = defineStore("workflow", {
 
       const shiftDistance = NODE_HEIGHT + SPACING;
 
-      // 1️⃣ 构建层级索引 (level -> nodeId[])
-      if (!this.levelNodeMap) {
-        this.levelNodeMap = new Map();
-        for (const [id, level] of this.nodeLevels) {
-          if (!this.levelNodeMap.has(level)) this.levelNodeMap.set(level, []);
-          this.levelNodeMap.get(level).push(id);
-        }
+      // 1️⃣ 重新构建层级索引 (每次调用时都基于最新拓扑重建，避免缓存过期)
+      const levelNodeMap = new Map();
+      for (const [id, level] of this.nodeLevels) {
+        if (!levelNodeMap.has(level)) levelNodeMap.set(level, []);
+        levelNodeMap.get(level).push(id);
       }
 
       const startLevel = direction === "below" ? targetLevel + 1 : targetLevel;
 
       // 2️⃣ 只移动受影响层级的节点
       const affectedLevels = [];
-      for (const [level, nodeIds] of this.levelNodeMap) {
+      for (const [level] of levelNodeMap) {
         if (level >= startLevel) affectedLevels.push(level);
       }
       for (const level of affectedLevels) {
-        for (const nodeId of this.levelNodeMap.get(level)) {
+        for (const nodeId of levelNodeMap.get(level)) {
           const node = this.nodes.get(nodeId);
           if (!node) continue;
           node.position.y += shiftDistance;
@@ -928,31 +926,29 @@ export const useWorkflowStore = defineStore("workflow", {
       const newNodes = new Map(this.nodes);
       newNodes.set(newNodeId, nodeC);
 
-      // 5️⃣ 建立边索引
-      if (!this.edgeSourceMap) {
-        this.edgeSourceMap = new Map();
-        this.edgeTargetMap = new Map();
-        for (const [id, edge] of this.edges) {
-          if (!this.edgeSourceMap.has(edge.source))
-            this.edgeSourceMap.set(edge.source, []);
-          if (!this.edgeTargetMap.has(edge.target))
-            this.edgeTargetMap.set(edge.target, []);
-          this.edgeSourceMap.get(edge.source).push(id);
-          this.edgeTargetMap.get(edge.target).push(id);
-        }
+      // 5️⃣ 基于当前边重建索引（每次都重建，确保二次插入也正确连边）
+      const edgeSourceIndex = new Map();
+      const edgeTargetIndex = new Map();
+      for (const [id, edge] of this.edges) {
+        if (!edgeSourceIndex.has(edge.source))
+          edgeSourceIndex.set(edge.source, []);
+        if (!edgeTargetIndex.has(edge.target))
+          edgeTargetIndex.set(edge.target, []);
+        edgeSourceIndex.get(edge.source).push(id);
+        edgeTargetIndex.get(edge.target).push(id);
       }
 
       const newEdges = new Map(this.edges);
       const edgesToDelete = [];
 
       if (direction === "below") {
-        const outgoing = this.edgeSourceMap.get(targetNodeId) || [];
+        const outgoing = edgeSourceIndex.get(targetNodeId) || [];
         outgoing.forEach((edgeId) => {
           const edge = this.edges.get(edgeId);
           if (!edge) return;
           edgesToDelete.push(edgeId);
 
-          const newEdgeId = `e_c_${edge.target}_${Date.now()}`;
+          const newEdgeId = `e_${newNodeId}_${edge.target}_${Date.now()}`;
           newEdges.set(newEdgeId, {
             id: newEdgeId,
             source: newNodeId,
@@ -961,7 +957,7 @@ export const useWorkflowStore = defineStore("workflow", {
           });
         });
 
-        const connectingEdgeId = `e_a_${newNodeId}_${Date.now()}`;
+        const connectingEdgeId = `e_${targetNodeId}_${newNodeId}_${Date.now()}`;
         newEdges.set(connectingEdgeId, {
           id: connectingEdgeId,
           source: targetNodeId,
@@ -969,13 +965,13 @@ export const useWorkflowStore = defineStore("workflow", {
         });
       } else {
         // 'above'
-        const incoming = this.edgeTargetMap.get(targetNodeId) || [];
+        const incoming = edgeTargetIndex.get(targetNodeId) || [];
         incoming.forEach((edgeId) => {
           const edge = this.edges.get(edgeId);
           if (!edge) return;
           edgesToDelete.push(edgeId);
 
-          const newEdgeId = `e_${edge.source}_c_${Date.now()}`;
+          const newEdgeId = `e_${edge.source}_${newNodeId}_${Date.now()}`;
           newEdges.set(newEdgeId, {
             id: newEdgeId,
             source: edge.source,
@@ -984,7 +980,7 @@ export const useWorkflowStore = defineStore("workflow", {
           });
         });
 
-        const connectingEdgeId = `e_c_${targetNodeId}_${Date.now()}`;
+        const connectingEdgeId = `e_${newNodeId}_${targetNodeId}_${Date.now()}`;
         newEdges.set(connectingEdgeId, {
           id: connectingEdgeId,
           source: newNodeId,
@@ -998,14 +994,127 @@ export const useWorkflowStore = defineStore("workflow", {
       // 6️⃣ 批量替换响应式数据
       this.nodes = newNodes;
       this.edges = newEdges;
+    },
 
-      // 7️⃣ 更新层级索引
-      if (!this.nodeLevels.has(newNodeId)) {
-        this.nodeLevels.set(newNodeId, startLevel);
-        if (!this.levelNodeMap.has(startLevel))
-          this.levelNodeMap.set(startLevel, []);
-        this.levelNodeMap.get(startLevel).push(newNodeId);
+    // 在当前节点下方插入一个“分支”节点，并自动创建两个分支子任务
+    insertBranchNode(targetNodeId) {
+      const nodeA = this.nodes.get(targetNodeId);
+      const targetLevel = this.nodeLevels.get(targetNodeId);
+      if (!nodeA || targetLevel === undefined) return;
+
+      const shiftDistance = NODE_HEIGHT + SPACING;
+
+      // 1️⃣ 重建层级索引并下移受影响层级
+      const levelNodeMap = new Map();
+      for (const [id, level] of this.nodeLevels) {
+        if (!levelNodeMap.has(level)) levelNodeMap.set(level, []);
+        levelNodeMap.get(level).push(id);
       }
+      const startLevel = targetLevel + 1;
+      for (const [level, ids] of levelNodeMap) {
+        if (level >= startLevel) {
+          ids.forEach((nid) => {
+            const n = this.nodes.get(nid);
+            if (n) n.position.y += shiftDistance;
+          });
+        }
+      }
+
+      // 2️⃣ 创建分支节点和两个子任务
+      const branchId = `branch_${Date.now()}`;
+      const branchY =
+        nodeA.position.y + (nodeA.height ?? NODE_HEIGHT) + SPACING;
+      const branchNode = {
+        id: branchId,
+        type: NODE_TYPES.BRANCH,
+        label: "分支",
+        position: { x: nodeA.position.x, y: branchY },
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        status: NODE_STATUS.PENDING,
+        condition: "Math.random() > 0.5",
+      };
+
+      const leftId = `task_${Date.now()}_yes`;
+      const rightId = `task_${Date.now()}_no`;
+      const childY = branchY + NODE_HEIGHT + SPACING;
+      const childOffsetX = 150;
+      const leftNode = {
+        id: leftId,
+        type: NODE_TYPES.TASK,
+        label: "是分支",
+        position: { x: nodeA.position.x - childOffsetX, y: childY },
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        status: NODE_STATUS.PENDING,
+      };
+      const rightNode = {
+        id: rightId,
+        type: NODE_TYPES.TASK,
+        label: "否分支",
+        position: { x: nodeA.position.x + childOffsetX, y: childY },
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        status: NODE_STATUS.PENDING,
+      };
+
+      // 3️⃣ 复制节点集合并加入新节点
+      const newNodes = new Map(this.nodes);
+      newNodes.set(branchId, branchNode);
+      newNodes.set(leftId, leftNode);
+      newNodes.set(rightId, rightNode);
+
+      // 4️⃣ 处理边：断开 target 的原有出边，改为从分支的“是”分支续接
+      const edgeSourceIndex = new Map();
+      for (const [id, edge] of this.edges) {
+        if (!edgeSourceIndex.has(edge.source))
+          edgeSourceIndex.set(edge.source, []);
+        edgeSourceIndex.get(edge.source).push(id);
+      }
+      const newEdges = new Map(this.edges);
+      const edgesToDelete = [];
+
+      const outgoing = edgeSourceIndex.get(targetNodeId) || [];
+      outgoing.forEach((edgeId) => {
+        const edge = this.edges.get(edgeId);
+        if (!edge) return;
+        edgesToDelete.push(edgeId);
+
+        // 将原有出边迁移到“是分支”子节点
+        const migratedId = `e_${leftId}_${edge.target}_${Date.now()}`;
+        newEdges.set(migratedId, {
+          id: migratedId,
+          source: leftId,
+          target: edge.target,
+          label: edge.label,
+        });
+      });
+
+      // 连接 target -> branch
+      const e1 = `e_${targetNodeId}_${branchId}_${Date.now()}`;
+      newEdges.set(e1, { id: e1, source: targetNodeId, target: branchId });
+      // branch -> left/right 子分支
+      const eYes = `e_${branchId}_${leftId}_${Date.now()}`;
+      const eNo = `e_${branchId}_${rightId}_${Date.now()}`;
+      newEdges.set(eYes, {
+        id: eYes,
+        source: branchId,
+        target: leftId,
+        label: "是",
+      });
+      newEdges.set(eNo, {
+        id: eNo,
+        source: branchId,
+        target: rightId,
+        label: "否",
+      });
+
+      // 删除旧边
+      edgesToDelete.forEach((id) => newEdges.delete(id));
+
+      // 5️⃣ 提交替换
+      this.nodes = newNodes;
+      this.edges = newEdges;
     },
 
     async saveWorkflow(url = "/api/workflow/save") {
